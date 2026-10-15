@@ -36,6 +36,7 @@ function AppInner() {
   const [videoOpen, setVideoOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
   const [playlistModalItem, setPlaylistModalItem] = useState<MediaItem | null>(null);
   const apiKey = '';
 
@@ -127,7 +128,7 @@ function AppInner() {
       {/* Main layout */}
       <div className="app-layout flex h-dvh pb-mobile-player md:pb-[90px]">
         {/* Desktop Sidebar */}
-        <div className={`sidebar hidden md:block w-72 flex-shrink-0 p-3 h-full ${focusMode ? '!hidden' : ''}`}>
+        <div id="desktop-sidebar" className={`sidebar hidden md:block w-72 flex-shrink-0 p-3 h-full ${focusMode || desktopSidebarCollapsed ? '!hidden' : ''}`}>
           <Sidebar
             view={view}
             onViewChange={handleViewChange}
@@ -141,13 +142,32 @@ function AppInner() {
         <div className="app-main min-w-0 flex-1 flex flex-col overflow-hidden p-2 md:p-3 md:pl-0 gap-2 md:gap-3">
           {/* Top nav */}
           <div className="app-header glass-panel rounded-xl flex items-center gap-3 px-3 md:px-4 py-2.5 md:py-3 flex-shrink-0">
-            {/* Mobile hamburger */}
+            {/* Navigation toggle at each screen size */}
+            <div className="md:hidden">
             <button
-              className="icon-btn md:hidden flex-shrink-0"
+              type="button"
+              aria-label="Abrir menu"
+              aria-expanded={sidebarOpen}
+              className="icon-btn flex-shrink-0"
               onClick={() => setSidebarOpen(true)}
             >
               <Menu size={20} />
             </button>
+            </div>
+            <div className="hidden md:block">
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={focusMode || desktopSidebarCollapsed ? 'Abrir menu lateral' : 'Recolher menu lateral'}
+                title={focusMode || desktopSidebarCollapsed ? 'Abrir menu lateral' : 'Recolher menu lateral'}
+                aria-controls="desktop-sidebar"
+                aria-expanded={!focusMode && !desktopSidebarCollapsed}
+                onClick={() => {
+                  if (focusMode) { setFocusMode(false); setDesktopSidebarCollapsed(false); }
+                  else setDesktopSidebarCollapsed(collapsed => !collapsed);
+                }}
+              ><Menu size={20} /></button>
+            </div>
 
             {focusMode && (
               <button
