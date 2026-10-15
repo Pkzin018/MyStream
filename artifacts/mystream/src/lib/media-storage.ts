@@ -1,12 +1,24 @@
 import {supabase} from './supabase';
+import {requestUploadTicket, BillingError} from './billing';
 import type {MediaItem, MediaType} from '../types';
-export async function uploadMedia(file:File,userId:string,tipo:MediaType):Promise<MediaItem> {
- if(file.size>50*1024*1024) throw new Error('Cada arquivo pode ter até 50 MB.');
- const extension = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g,'') || 'bin';
- const path=userId+'/'+crypto.randomUUID()+'.'+extension;
- const {error}=await supabase.storage.from('mystream-media').upload(path,file,{upsert:false,contentType:file.type});
- if(error) throw new Error('Não foi possível enviar este arquivo. Verifique o formato e tente novamente.');
- const {data,error:signError}=await supabase.storage.from('mystream-media').createSignedUrl(path,86400);
- if(signError) throw signError;
- return {storagePath:path,url:data.signedUrl,nome:file.name.replace(/\.[^/.]+$/,''),thumb:'',tipo};
+
+const MIME_ALIASES: Record<string, string> = {'audio/mp3': 'audio/mpeg', 'audio/x-m4a': 'audio/mp4', 'audio/m4a': 'audio/mp4', 'audio/wave': 'audio/wav', 'audio/x-flac': 'audio/flac'};
+export const normalizeMime = (type: string) => MIME_ALIASES[type] || type;
+
+// Envia um arquivo para o armazenamento privado. O servidor confere a cota do plano
+// e devolve um ticket de envio; o arquivo vai direto do navegador para o Supabase.
+export async function uploadToTicket(file: File, kind: 'media' | 'avatar'): Promise<string> {
+ const extension = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+ const contentType = normalizeMime(file.type);
+ const ticket = await requestUploadTicket({kind, size: file.size, ext: extension, contentType});
+ const {error} = await supabase.storage.from('mystream-media').uploadToSignedUrl(ticket.path, ticket.token, file, {contentType});
+ if (error) throw new BillingError('Não foi possível enviar este arquivo. Verifique o formato e tente novamente.', 'UPLOAD_FAILED');
+ return ticket.path;
+}
+
+export async function uploadMedia(file: File, _userId: string, tipo: MediaType): Promise<MediaItem> {
+ const path = await uploadToTicket(file, 'media');
+ const {data, error: signError} = await supabase.storage.from('mystream-media').createSignedUrl(path, 86400);
+ if (signError) throw signError;
+ return {storagePath: path, url: data.signedUrl, nome: file.name.replace(/\.[^/.]+$/, ''), thumb: '', tipo};
 }

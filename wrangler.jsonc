@@ -5,5 +5,13 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": {"directory": "artifacts/mystream/dist/public", "binding": "ASSETS", "run_worker_first": ["/api/*"], "not_found_handling": "single-page-application"},
   "ratelimits": [{"name": "SEARCH_LIMITER", "namespace_id": "1001", "simple": {"limit": 10, "period": 60}}],
+  "vars": {
+    "SUPABASE_URL": "https://xrspxandleztuatjgvcx.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_BlZGtUAsZ4MCHAauby_VyA_7hzdMmto",
+    "BILLING_MODE": "test",
+    "PRO_PRICE_BRL": "14.90",
+    "FREE_STORAGE_MB": "200",
+    "PRO_STORAGE_MB": "2048"
+  },
   "observability": {"enabled": true, "head_sampling_rate": 0.1}
 }

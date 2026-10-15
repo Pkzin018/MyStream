@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { Plus, ListMusic, Play, Trash2, Edit3, Check, X } from 'lucide-react';
 import MediaCard from '../components/MediaCard';
 import { usePlayer } from '../context/PlayerContext';
+import { useBilling } from '../context/BillingContext';
+import { openPlan } from '../lib/billing';
 import type { MediaItem, Playlist } from '../types';
 
 interface PlaylistsPageProps {
@@ -11,6 +13,9 @@ interface PlaylistsPageProps {
 
 export default function PlaylistsPage({ onAddToPlaylist }: PlaylistsPageProps) {
   const { state, dispatch, tocarItem } = usePlayer();
+  const { status: plan } = useBilling();
+  const limite = plan?.limits.playlists ?? null;
+  const noLimite = limite !== null && state.playlists.length >= limite;
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [criando, setCriando] = useState(false);
   const [novoNome, setNovoNome] = useState('');
@@ -18,7 +23,7 @@ export default function PlaylistsPage({ onAddToPlaylist }: PlaylistsPageProps) {
   const [editNome, setEditNome] = useState('');
 
   const handleCriar = () => {
-    if (!novoNome.trim()) return;
+    if (!novoNome.trim() || noLimite) return;
     dispatch({ type: 'CRIAR_PLAYLIST', payload: { nome: novoNome.trim() } });
     setNovoNome('');
     setCriando(false);
@@ -116,9 +121,9 @@ export default function PlaylistsPage({ onAddToPlaylist }: PlaylistsPageProps) {
         </motion.h2>
         <button
           className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-bold hover:brightness-110 transition-all"
-          onClick={() => setCriando(true)}
+          onClick={() => noLimite ? openPlan() : setCriando(true)}
         >
-          <Plus size={15} /> Nova Playlist
+          <Plus size={15} /> {noLimite ? 'Limite atingido · Ver Pro' : 'Nova Playlist'}
         </button>
       </div>
 
@@ -152,7 +157,7 @@ export default function PlaylistsPage({ onAddToPlaylist }: PlaylistsPageProps) {
           <p className="text-sm">Crie sua primeira playlist para organizar suas músicas</p>
           <button
             className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-full text-sm font-bold hover:brightness-110 transition-all"
-            onClick={() => setCriando(true)}
+            onClick={() => noLimite ? openPlan() : setCriando(true)}
           >
             <Plus size={15} /> Criar Playlist
           </button>

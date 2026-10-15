@@ -3,10 +3,15 @@ import {ArrowLeft, User, LockKeyhole, Sun, Moon, Mail} from 'lucide-react';
 import {supabase} from '../lib/supabase';
 import {useAccount} from '../context/AccountContext';
 import {authMessage} from '../lib/auth-errors';
+import {uploadToTicket} from '../lib/media-storage';
+import PlanPanel from '../components/PlanPanel';
+import {Crown} from 'lucide-react';
 
-export default function SettingsPage({onBack}:{onBack:()=>void}) {
+type Tab='profile'|'password'|'plan';
+
+export default function SettingsPage({onBack,initialTab='profile'}:{onBack:()=>void;initialTab?:Tab}) {
  const {user,avatar}=useAccount();
- const [tab,setTab]=useState<'profile'|'password'>('profile');
+ const [tab,setTab]=useState<Tab>(initialTab);
  const [name,setName]=useState(user?.user_metadata?.display_name || '');
  const [theme,setTheme]=useState(user?.user_metadata?.theme === 'light' ? 'light' : 'dark');
  const [photo,setPhoto]=useState<File|null>(null);
@@ -22,9 +27,7 @@ export default function SettingsPage({onBack}:{onBack:()=>void}) {
    let path=user.user_metadata?.avatar_path;
    if(photo){
     if(photo.size>2*1024*1024 || !['image/jpeg','image/png','image/webp'].includes(photo.type))throw new Error('Use uma foto JPG, PNG ou WebP de até 2 MB.');
-    uploaded=user.id+'/avatar-'+crypto.randomUUID();
-    const {error}=await supabase.storage.from('mystream-media').upload(uploaded,photo,{contentType:photo.type});
-    if(error)throw new Error('Não foi possível enviar sua foto.');path=uploaded;
+    uploaded=await uploadToTicket(photo,'avatar');path=uploaded;
    }
    const {error}=await supabase.auth.updateUser({data:{display_name:name.trim(),avatar_path:path || null,theme}});
    if(error)throw error;
@@ -44,8 +47,8 @@ export default function SettingsPage({onBack}:{onBack:()=>void}) {
   <button onClick={onBack} className="flex items-center gap-2 text-sm text-muted-foreground mb-6"><ArrowLeft size={18}/>Voltar</button>
   <h1 className="text-2xl md:text-3xl font-bold">Configurações da conta</h1>
   <p className="text-muted-foreground mt-2 mb-6">Seu perfil, sua aparência e sua segurança.</p>
-  <nav aria-label="Configurações" className="flex gap-2 border-b border-border pb-3 mb-6">{([{id:'profile',label:'Perfil',Icon:User},{id:'password',label:'Senha',Icon:LockKeyhole}] as const).map(({id,label,Icon})=><button key={id} disabled={busy} aria-current={tab===id?'page':undefined} onClick={()=>{setTab(id);setMessage('');}} className={`flex gap-2 items-center rounded-xl px-5 py-3 ${tab===id?'bg-primary text-black font-semibold':'bg-secondary text-foreground'}`}><Icon size={18}/>{label}</button>)}</nav>
-  {tab==='profile'?<form onSubmit={save} className="space-y-6">
+  <nav aria-label="Configurações" className="flex gap-2 border-b border-border pb-3 mb-6">{([{id:'profile',label:'Perfil',Icon:User},{id:'password',label:'Senha',Icon:LockKeyhole},{id:'plan',label:'Plano',Icon:Crown}] as const).map(({id,label,Icon})=><button key={id} disabled={busy} aria-current={tab===id?'page':undefined} onClick={()=>{setTab(id);setMessage('');}} className={`flex gap-2 items-center rounded-xl px-5 py-3 ${tab===id?'bg-primary text-black font-semibold':'bg-secondary text-foreground'}`}><Icon size={18}/>{label}</button>)}</nav>
+  {tab==='plan'?<PlanPanel/>:tab==='profile'?<form onSubmit={save} className="space-y-6">
    <div className="flex flex-wrap items-center gap-5">{preview||avatar?<img src={preview||avatar} alt="Foto de perfil" className="w-24 h-24 rounded-full object-cover border border-border"/>:<div className="w-24 h-24 rounded-full bg-secondary flex items-center justify-center"><User size={36}/></div>}<label className="text-sm font-semibold">Trocar foto<input aria-label="Trocar foto" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={e=>setPhoto(e.target.files?.[0] || null)} className="block max-w-full text-xs mt-3"/><span className="block text-xs text-muted-foreground mt-2">JPG, PNG ou WebP · até 2 MB</span></label></div>
    <label className="block text-sm font-semibold">Nome<input required maxLength={80} value={name} onChange={e=>setName(e.target.value)} className="block mt-2 w-full rounded-xl p-3 bg-secondary border border-border"/></label>
    <div><p className="text-sm font-semibold">E-mail cadastrado</p><p className="mt-2 text-muted-foreground break-all">{user?.email}</p></div>

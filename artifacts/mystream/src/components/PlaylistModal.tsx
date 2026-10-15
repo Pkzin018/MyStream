@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Check } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
+import { useBilling } from '../context/BillingContext';
+import { openPlan } from '../lib/billing';
 import type { MediaItem } from '../types';
 
 interface PlaylistModalProps {
@@ -12,6 +14,9 @@ interface PlaylistModalProps {
 
 export default function PlaylistModal({ isOpen, item, onClose }: PlaylistModalProps) {
   const { state, dispatch } = usePlayer();
+  const { status: plan } = useBilling();
+  const limite = plan?.limits.playlists ?? null;
+  const noLimite = limite !== null && state.playlists.length >= limite;
   const [novaPlaylist, setNovaPlaylist] = useState('');
   const [criando, setCriando] = useState(false);
   const [adicionados, setAdicionados] = useState<Set<string>>(new Set());
@@ -23,7 +28,7 @@ export default function PlaylistModal({ isOpen, item, onClose }: PlaylistModalPr
   };
 
   const handleCriar = () => {
-    if (!novaPlaylist.trim()) return;
+    if (!novaPlaylist.trim() || noLimite) return;
     dispatch({ type: 'CRIAR_PLAYLIST', payload: { nome: novaPlaylist.trim() } });
     setNovaPlaylist('');
     setCriando(false);
@@ -108,10 +113,10 @@ export default function PlaylistModal({ isOpen, item, onClose }: PlaylistModalPr
             ) : (
               <button
                 className="w-full flex items-center gap-2 justify-center py-3 rounded-xl border border-dashed border-white/20 text-sm text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
-                onClick={() => setCriando(true)}
+                onClick={() => noLimite ? openPlan() : setCriando(true)}
               >
                 <Plus size={16} />
-                Nova Playlist
+                {noLimite ? `Limite de ${limite} playlists · Ver Pro` : 'Nova Playlist'}
               </button>
             )}
           </motion.div>

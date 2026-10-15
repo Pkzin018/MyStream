@@ -4,6 +4,8 @@ import { Home, Compass, Heart, ListMusic, Music, Video, Plus, User, LogIn } from
 import { useAccount } from '../context/AccountContext';
 import { usePlayer } from '../context/PlayerContext';
 import {uploadMedia} from '../lib/media-storage';
+import {useBilling} from '../context/BillingContext';
+import {BillingError, formatBytes, openPlan} from '../lib/billing';
 import type { MediaType } from '../types';
 
 type View = 'inicio' | 'explorar' | 'favoritos' | 'playlists';
@@ -26,19 +28,22 @@ const MENU_ITEMS = [
 export default function Sidebar({ view, onViewChange, onAddMedia, apiKey, onSetApiKey }: SidebarProps) {
   const { dispatch, flushAccount } = usePlayer();
   const { user, signOut } = useAccount();
+  const { status: plan, refresh: refreshPlan } = useBilling();
   const [ytLink, setYtLink] = useState('');
   const audioInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
   const [uploadStatus,setUploadStatus]=useState('');
+  const [quotaFull,setQuotaFull]=useState(false);
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>,tipo:MediaType) => {
     const files=Array.from(e.target.files || []); e.target.value='';
     if(!user || !files.length) return;
-    setUploadStatus('Enviando arquivos…');
+    setUploadStatus('Enviando arquivos…');setQuotaFull(false);
     try {
       for(const file of files) onAddMedia(await uploadMedia(file,user.id,tipo));
       setUploadStatus('Arquivos adicionados à sua biblioteca.');
-    } catch(error) {setUploadStatus(error instanceof Error?error.message:'Não foi possível enviar.');}
+    } catch(error) {setQuotaFull(error instanceof BillingError && error.code==='QUOTA_EXCEEDED');setUploadStatus(error instanceof Error?error.message:'Não foi possível enviar.');}
+    finally {void refreshPlan();}
   };
   const handleAudioUpload=(e:React.ChangeEvent<HTMLInputElement>)=>void handleUpload(e,'audio');
   const handleVideoUpload=(e:React.ChangeEvent<HTMLInputElement>)=>void handleUpload(e,'video');
@@ -114,8 +119,9 @@ export default function Sidebar({ view, onViewChange, onAddMedia, apiKey, onSetA
           </button>
         </div>
 
-        <p className="text-[10px] text-muted-foreground mb-3">Áudios e vídeos privados na sua conta · até 50 MB por arquivo.</p>
-        {uploadStatus && <p role="status" className="text-xs text-amber-200 mb-3">{uploadStatus}</p>}
+        <p className="text-[10px] text-muted-foreground mb-2">Áudios e vídeos privados na sua conta · até 50 MB por arquivo.</p>
+        {plan && <button onClick={openPlan} className="w-full text-left text-[10px] text-muted-foreground mb-3 hover:text-foreground" title="Ver meu plano">{formatBytes(plan.usedBytes)} de {formatBytes(plan.limits.storageBytes)} usados · {plan.plan==='pro'?'Pro ativo':'Assinar o Pro'}</button>}
+        {uploadStatus && <p role="status" className="text-xs text-amber-200 mb-3">{uploadStatus}{quotaFull && <button onClick={openPlan} className="block mt-1 underline font-semibold">Ver planos</button>}</p>}
         <input ref={audioInputRef} type="file" accept="audio/*" hidden multiple onChange={handleAudioUpload} />
         <input ref={videoInputRef} type="file" accept="video/*" hidden multiple onChange={handleVideoUpload} />
 

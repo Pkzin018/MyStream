@@ -1,3 +1,4 @@
+import { handleBilling } from './billing.mjs';
 export function parseDuration(value) {
   const m = /^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/.exec(value || '');
   return m ? Number(m[1] || 0)*86400 + Number(m[2] || 0)*3600 + Number(m[3] || 0)*60 + Number(m[4] || 0) : undefined;
@@ -8,6 +9,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === '/api/health') return json({ ok: true, searchConfigured: Boolean(env.YOUTUBE_API_KEY) });
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+    if (url.pathname.startsWith('/api/billing/') || url.pathname.startsWith('/api/media/')) return handleBilling(request, env, url);
     if (url.pathname !== '/api/yt/search') return json({message:'Rota não encontrada.'},404);
     if (request.method !== 'GET') return json({message:'Método não permitido.'},405,{'Allow':'GET'});
     const origin = request.headers.get('Origin');

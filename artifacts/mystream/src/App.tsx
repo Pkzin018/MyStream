@@ -16,6 +16,7 @@ import { AccountProvider, useAccount } from './context/AccountContext';
 import AccountScreen from './components/AccountScreen';
 import PasswordResetScreen from './components/PasswordResetScreen';
 import SettingsPage from './pages/SettingsPage';
+import {BillingProvider} from './context/BillingContext';
 import type { MediaItem, MediaType } from './types';
 
 type View = 'inicio' | 'explorar' | 'favoritos' | 'playlists';
@@ -25,7 +26,8 @@ const LS_API_KEY = 'mystream_yt_api_key';
 function AppInner() {
   const { corDinamica, dispatch, itemAtual, tocando, anteriorMidia, proximaMidia } = usePlayer();
   const {user,avatar}=useAccount();
-  const [profileOpen,setProfileOpen]=useState(false);
+  const [profileOpen,setProfileOpen]=useState(()=>new URLSearchParams(window.location.search).get('billing')==='return');
+  const [profileTab,setProfileTab]=useState<'profile'|'password'|'plan'>(()=>new URLSearchParams(window.location.search).get('billing')==='return'?'plan':'profile');
   const [view, setView] = useState<View>('inicio');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -46,6 +48,13 @@ function AppInner() {
     setProfileOpen(false);
     setView('explorar');
   };
+
+  useEffect(() => {
+    if(new URLSearchParams(window.location.search).has('billing')) window.history.replaceState(null,'',window.location.pathname);
+    const openPlan=()=>{setProfileTab('plan');setProfileOpen(true);setSidebarOpen(false);};
+    window.addEventListener('mystream-open-plan',openPlan);
+    return ()=>window.removeEventListener('mystream-open-plan',openPlan);
+  }, []);
 
   useEffect(() => {
     const reopen = (event: Event) => setVideoOpen((event as CustomEvent<{tipo: string}>).detail.tipo === 'yt' || (event as CustomEvent<{tipo: string}>).detail.tipo === 'video');
@@ -149,7 +158,7 @@ function AppInner() {
               </button>
             )}
 
-            <button aria-label="Meu perfil" title="Meu perfil" onClick={()=>setProfileOpen(true)} className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">{avatar?<img src={avatar} alt="Meu perfil" className="w-9 h-9 rounded-full object-cover"/>:<span className="text-sm font-bold">{(user?.user_metadata?.display_name || user?.email || 'M').slice(0,1).toUpperCase()}</span>}</button>
+            <button aria-label="Meu perfil" title="Meu perfil" onClick={()=>{setProfileTab('profile');setProfileOpen(true);}} className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">{avatar?<img src={avatar} alt="Meu perfil" className="w-9 h-9 rounded-full object-cover"/>:<span className="text-sm font-bold">{(user?.user_metadata?.display_name || user?.email || 'M').slice(0,1).toUpperCase()}</span>}</button>
             {/* Search */}
             <div className="flex-1 min-w-0 relative">
               <div className="flex items-center gap-2 bg-white/10 rounded-full px-3 md:px-4 py-2 md:py-2.5 focus-within:bg-white/15 focus-within:border-white/20 border border-transparent transition-all">
@@ -181,7 +190,7 @@ function AppInner() {
           <div className="min-w-0 flex-1 flex gap-3 overflow-hidden">
             {/* Scroll area */}
             <div className="app-content min-w-0 glass-panel rounded-xl flex-1 overflow-y-auto p-3 md:p-6 scroll-smooth">
-              {profileOpen ? <SettingsPage onBack={()=>setProfileOpen(false)}/> : <AnimatePresence mode="wait">
+              {profileOpen ? <SettingsPage key={profileTab} initialTab={profileTab} onBack={()=>setProfileOpen(false)}/> : <AnimatePresence mode="wait">
                 {view === 'inicio' && (
                   <motion.div
                     key="inicio"
@@ -281,6 +290,6 @@ function AccountApp() {
   if(loading) return <main className="min-h-screen bg-background text-foreground flex items-center justify-center">Carregando sua conta…</main>;
   if(user && recovery) return <PasswordResetScreen/>;
   if(!user) return <><AccountScreen />{error && <p role="alert" className="fixed bottom-4 left-4 text-red-300">{error}</p>}</>;
-  return <PlayerProvider key={user.id}><AppInner /></PlayerProvider>;
+  return <BillingProvider key={user.id}><PlayerProvider key={user.id}><AppInner /></PlayerProvider></BillingProvider>;
 }
 export default function App() {return <AccountProvider><AccountApp /></AccountProvider>;}
