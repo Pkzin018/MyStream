@@ -1,3 +1,5 @@
+import {handleRenewal} from './pix-renewal.mjs';
+import {sendRenewalReminders} from './renewals.mjs';
 import { handlePix } from './pix.mjs';
 import { handleBilling } from './billing.mjs';
 export function parseDuration(value) {
@@ -6,6 +8,7 @@ export function parseDuration(value) {
 }
 const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers } });
 export default {
+  async scheduled(event,env,ctx){ctx.waitUntil(sendRenewalReminders(env));},
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname === '/api/health') return json({ ok: true, searchConfigured: Boolean(env.YOUTUBE_API_KEY) });
@@ -15,6 +18,7 @@ export default {
       if (topic === 'order') return handlePix(request,env,url);
       return handleBilling(request,env,url);
     }
+    if (url.pathname === '/api/billing/renew' || url.pathname === '/api/billing/renew/status') return handleRenewal(request,env,url);
     if (url.pathname === '/api/billing/pix' || url.pathname === '/api/billing/pix/status') return handlePix(request,env,url);
     if (url.pathname.startsWith('/api/billing/') || url.pathname.startsWith('/api/media/')) return handleBilling(request, env, url);
     if (url.pathname !== '/api/yt/search') return json({message:'Rota não encontrada.'},404);

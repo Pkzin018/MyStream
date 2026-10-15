@@ -9,6 +9,8 @@ test('test routes enforce authentication, server admin role and no real charges'
  let role='user'; let saved;
  globalThis.fetch=async(url,init={})=>{
   if(url.includes('/auth/v1/user')) return Response.json({id:uid,app_metadata:{mystream_role:role}});
+  if(url.includes('/rest/v1/mystream_pix_renewals')) return Response.json([]);
+  if(url.includes('/rest/v1/mystream_pix_tests')) return Response.json([]);
   if(url.includes('/rest/v1/mystream_subscriptions')) {
    if(init.method==='POST'){saved=JSON.parse(init.body);return new Response(null,{status:204});}
    return Response.json(saved?[saved]:[]);

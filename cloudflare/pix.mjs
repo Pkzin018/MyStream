@@ -1,19 +1,21 @@
+import {syncRenewal} from './pix-renewal.mjs';
 import {authUser, sb, mp, verifySignature} from './billing.mjs';
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 const table='/rest/v1/mystream_pix_tests';
 export function summarize(order,row) {
- if(order.id!==row.order_id || order.external_reference!==row.request_id || Number(order.total_amount)!==1 || (order.currency_id && order.currency_id!=='BRL') || (order.country_code && order.country_code!=='BRA')) throw new Error('order mismatch');
+ if(order.id!==row.order_id || order.external_reference!==row.request_id || Number(order.total_amount)!==Number(row.amount || 1) || (order.currency_id && order.currency_id!=='BRL') || (order.country_code && order.country_code!=='BRA')) throw new Error('order mismatch');
  const payment=order.transactions?.payments?.[0];
- if(!payment && ['processing','created'].includes(order.status))return {id:order.id,status:order.status,detail:order.status_detail,paid:false,amount:'1.00',qrCode:'',qrImage:''};
- if(payment?.payment_method?.id!=='pix' || Number(payment.amount)!==1) throw new Error('payment mismatch');
+ if(!payment && ['processing','created'].includes(order.status))return {id:order.id,status:order.status,detail:order.status_detail,paid:false,amount:Number(row.amount || 1).toFixed(2),qrCode:'',qrImage:''};
+ if(payment?.payment_method?.id!=='pix' || Number(payment.amount)!==Number(row.amount || 1)) throw new Error('payment mismatch');
  const paid=order.status==='processed' && order.status_detail==='accredited' && payment.status==='processed' && payment.status_detail==='accredited';
- return {id:order.id,status:order.status,detail:order.status_detail,paid,amount:'1.00',qrCode:payment.payment_method.qr_code || '',qrImage:payment.payment_method.qr_code_base64 || ''};
+ return {id:order.id,status:order.status,detail:order.status_detail,paid,amount:Number(row.amount || 1).toFixed(2),qrCode:payment.payment_method.qr_code || '',qrImage:payment.payment_method.qr_code_base64 || ''};
 }
 async function getRow(env,uid) {return (await sb(env,table+'?user_id=eq.'+uid+'&select=*'))?.[0];}
-async function sync(env,row) {
+export async function sync(env,row) {
  const order=await mp(env,'/v1/orders/'+encodeURIComponent(row.order_id));
  const result=summarize(order,row);
  await sb(env,table+'?user_id=eq.'+row.user_id,{method:'PATCH',body:JSON.stringify({status:result.status,paid:result.paid,updated_at:new Date().toISOString()})});
+ if(result.paid) await sb(env,'/rest/v1/rpc/mystream_activate_paid_pix',{method:'POST',body:JSON.stringify({p_user_id:row.user_id,p_order_id:row.order_id})});
  return result;
 }
 export async function handlePix(request,env,url) {
@@ -27,6 +29,7 @@ export async function handlePix(request,env,url) {
   try {
    const rows=await sb(env,table+'?order_id=eq.'+id+'&select=*');
    if(rows?.[0])await sync(env,rows[0]);
+   else {const renewals=await sb(env,'/rest/v1/mystream_pix_renewals?order_id=eq.'+id+'&select=*');if(renewals?.[0])await syncRenewal(env,renewals[0]);}
    return json({ok:true});
   }catch{return json({message:'Falha temporária ao confirmar a order.'},502);}
  }
@@ -50,7 +53,7 @@ export async function handlePix(request,env,url) {
    row=await getRow(env,user.id);
   }
   if(row.order_id)return json({payment:await sync(env,row),webhookConfigured:Boolean(env.MP_WEBHOOK_SECRET)});
-  const order=await mp(env,'/v1/orders',{method:'POST',headers:{'X-Idempotency-Key':row.request_id},body:JSON.stringify({type:'online',processing_mode:'automatic',total_amount:'1.00',external_reference:row.request_id,transactions:{payments:[{amount:'1.00',payment_method:{id:'pix',type:'bank_transfer'},expiration_time:'PT30M'}]},payer:{email:row.payer_email}})});
+  const order=await mp(env,'/v1/orders',{method:'POST',headers:{'X-Idempotency-Key':row.request_id},body:JSON.stringify({type:'online',processing_mode:'automatic',total_amount:Number(row.amount || 1).toFixed(2),external_reference:row.request_id,transactions:{payments:[{amount:Number(row.amount || 1).toFixed(2),payment_method:{id:'pix',type:'bank_transfer'},expiration_time:'PT30M'}]},payer:{email:row.payer_email}})});
   if(!/^ORD[A-Za-z0-9]+$/.test(order.id || ''))throw new Error('invalid order');
   row={...row,order_id:order.id};
   const result=summarize(order,row);

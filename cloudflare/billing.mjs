@@ -1,3 +1,5 @@
+import {syncRenewal} from './pix-renewal.mjs';
+import {renewalNotice} from './renewals.mjs';
 // MyStream Pro — assinaturas via Mercado Pago (preapproval) e cota de armazenamento.
 // Rotas: GET /api/billing/status · POST /api/billing/checkout · POST /api/billing/cancel
 //        POST /api/billing/webhook (Mercado Pago) · POST /api/media/upload-ticket
@@ -121,6 +123,10 @@ async function webhook(request, env, url) {
 
 // ---------- Rotas do usuário ----------
 async function status(env, user) {
+  const renewals=await sb(env,'/rest/v1/mystream_pix_renewals?user_id=eq.'+user.id+'&granted_at=is.null&order_id=not.is.null&select=*&order=created_at.desc&limit=1');
+  if(renewals?.[0])try{await syncRenewal(env,renewals[0]);}catch{/* Keeps the saved plan until the provider confirms. */}
+  const pixRows=await sb(env,'/rest/v1/mystream_pix_tests?user_id=eq.'+user.id+'&paid=eq.true&select=order_id,granted_at');
+  if(pixRows?.[0]?.order_id && !pixRows[0].granted_at) await sb(env,'/rest/v1/rpc/mystream_activate_paid_pix',{method:'POST',body:JSON.stringify({p_user_id:user.id,p_order_id:pixRows[0].order_id})});
   let row = await getRow(env, user.id);
   const stale = row?.updated_at && Date.now() - new Date(row.updated_at).getTime() > 6 * 3600000;
   if (!testMode(env) && row?.mp_preapproval_id && env.MP_ACCESS_TOKEN && (row.status === 'pending' || (row.status === 'authorized' && stale))) {
@@ -134,6 +140,7 @@ async function status(env, user) {
     plan: pro ? 'pro' : 'free',
     subscriptionStatus: row?.status || 'none',
     proUntil: row?.pro_until || null,
+    renewalNotice: row?.status === 'pix_paid' ? renewalNotice(row.pro_until) : null,
     renews: pro && row?.status === 'authorized',
     usedBytes: await storageUsed(env, user.id),
     limits: limitsFor(env, pro),
@@ -209,6 +216,8 @@ export async function handleBilling(request, env, url) {
   try {
     if (route === '/api/billing/test-plan') {
       if (!testMode(env) || !admin(user)) return json({message: 'Acesso restrito ao administrador em modo de teste.'}, 403);
+      const paidPix=await sb(env,'/rest/v1/mystream_pix_tests?user_id=eq.'+user.id+'&paid=eq.true&select=order_id');
+      if(paidPix?.length) return json({message:'Seu pagamento já ativou o Pro. A simulação de planos está encerrada nesta conta.'},409);
       const body = await request.json().catch(() => null);
       if (!['free','pro'].includes(body?.plan)) return json({message: 'Plano inválido.'}, 400);
       const existing = await getRow(env, user.id);

@@ -1,6 +1,7 @@
 import {supabase} from './supabase';
 
 export interface BillingStatus {
+ renewalNotice: {id:string;expired:boolean;expiresAt:string;title:string;message:string} | null;
  testMode: boolean;
  isAdmin: boolean;
  configured: boolean;
@@ -51,3 +52,5 @@ export const setTestPlan = (plan: 'free' | 'pro') => authed<BillingStatus>('/api
 
 export interface PixTestResult {payment: {id:string; status:string; detail:string; paid:boolean; amount:string; qrCode:string; qrImage:string} | null; webhookConfigured:boolean}
 export const pixTest = (body?:{email:string;confirmRealPayment:boolean}) => authed<PixTestResult>(body?'/api/billing/pix':'/api/billing/pix/status',body?{method:'POST',body:JSON.stringify(body)}:{});
+
+export const renewPix=(body?:{email:string;confirmRealPayment:boolean},orderId='')=>authed<Pick<PixTestResult,'payment'>>(body?'/api/billing/renew':'/api/billing/renew/status'+(orderId?'?orderId='+encodeURIComponent(orderId):''),body?{method:'POST',body:JSON.stringify(body)}:{});

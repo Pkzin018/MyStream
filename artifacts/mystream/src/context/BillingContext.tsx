@@ -18,6 +18,7 @@ export function BillingProvider({children}: {children: React.ReactNode}) {
   finally {setLoading(false);}
  }, [user?.id]);
  useEffect(() => {setStatus(null); setError(''); void refresh();}, [refresh]);
+ useEffect(()=>{const update=()=>{if(document.visibilityState==='visible')void refresh();};window.addEventListener('focus',update);const timer=setInterval(update,60000);return()=>{window.removeEventListener('focus',update);clearInterval(timer);};},[refresh]);
  return <BillingContext.Provider value={{status, loading, error, refresh}}>{children}</BillingContext.Provider>;
 }
 

@@ -1,11 +1,21 @@
-# Pix real de R$1,00 para administrador
+# MyStream Pro: Pix por período de 30 dias
 
-Acesse Perfil > Plano. Informe o e-mail real do pagador, confirme o pagamento real e clique em Gerar Pix de R$1,00. Confira recebedor e valor no banco antes de pagar. O teste é avulso e não altera o plano Pro.
+## Experiência
+Pagamento confirmado libera o Pro e exibe a tela animada “Agora você é Pro!”, benefícios, validade e armazenamento. Enquanto ativo, a tela principal de plano não mostra simulação, teste, QR antigo ou nova compra. A renovação abre nos últimos três dias do período. Um Pix novo confirmado estende a validade em 30 dias, preservando dias restantes.
 
-API utilizada: Orders /v1/orders. O valor é fixo no servidor e a criação é idempotente por usuário. Existe uma única cobrança de teste por conta, reutilizada em novas tentativas; não há renovação nem geração de outra cobrança após expirar nesta versão.
+O teste administrativo de R$1 usa a tabela mystream_pix_tests. Clientes usam /api/billing/renew e o valor PRO_PRICE_BRL (R$14,90 na configuração atual), registrado na cobrança no servidor. Não há débito automático. A geração e a confirmação são automáticas; o cliente autoriza cada pagamento no banco.
 
-A consulta direta autentica o administrador e obtém o status no Mercado Pago; a confirmação exige order e pagamento processed/accredited, valor R$1,00 e referência do registro local. Webhook valida assinatura e consulta a mesma API; só atualiza orders já registradas. Sem MP_WEBHOOK_SECRET, a consulta direta continua disponível, e o webhook retorna 503.
+As cobranças usam Orders API, valor fixado pelo servidor e chave de idempotência. Pix expirados podem ser substituídos por uma nova cobrança sem apagar o histórico. Ativação usa funções transacionais e granted_at para impedir dias extras por consulta repetida.
 
-Os segredos MP_ACCESS_TOKEN e MP_WEBHOOK_SECRET ficam somente na Cloudflare. Não altere BILLING_MODE para live: a assinatura original continua desabilitada.
+## Notificações
+O sino do aplicativo mostra aviso três dias antes de vencer e depois do vencimento. Os dados são atualizados ao voltar à aba e a cada minuto. O benefício Pro expira no servidor na data indicada; os arquivos existentes são preservados.
 
-Aplique supabase-pix-test.sql antes de publicar. Após deploy, teste manualmente a transferência: gerar QR não comprova recebimento. Não use este experimento como checkout público.
+## E-mails
+O Worker possui rotina diária às 11:00 UTC (08h em Brasília). Envia um lembrete próximo do vencimento e outro após vencer; registra envio por usuário, período e tipo. O serviço permanece desativado se RESEND_API_KEY ou EMAIL_FROM não estiverem configurados.
+
+Para ativar: criar uma chave de envio no Resend, verificar o domínio do remetente e cadastrar RESEND_API_KEY como Secret e EMAIL_FROM como remetente verificado na Cloudflare. A entrega real de e-mail ainda não foi validada.
+
+## Configuração e validação
+MP_ACCESS_TOKEN e MP_WEBHOOK_SECRET são Secrets do Worker. Sem MP_WEBHOOK_SECRET, o Webhook retorna 503; consultas autenticadas e periódicas verificam a order diretamente. BILLING_MODE continua test para manter desativada a antiga integração de assinatura por cartão. Isso não bloqueia o Pix avulso, explicitamente apresentado como pagamento real.
+
+Aplicar supabase-pix-test.sql, supabase-pix-activation.sql, supabase-pix-renewals.sql e supabase-renewals.sql. As tabelas de pagamentos são privadas, e apenas o servidor pode liberar benefícios. A ativação de 30 dias e a proteção contra repetição foram verificadas no banco; testes de renovação foram revertidos ao terminar.

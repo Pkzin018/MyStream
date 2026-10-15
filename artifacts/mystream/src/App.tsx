@@ -1,3 +1,4 @@
+import RenewalNotifications from './components/RenewalNotifications';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Menu } from 'lucide-react';
@@ -159,6 +160,7 @@ function AppInner() {
             )}
 
             <button aria-label="Meu perfil" title="Meu perfil" onClick={()=>{setProfileTab('profile');setProfileOpen(true);}} className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">{avatar?<img src={avatar} alt="Meu perfil" className="w-9 h-9 rounded-full object-cover"/>:<span className="text-sm font-bold">{(user?.user_metadata?.display_name || user?.email || 'M').slice(0,1).toUpperCase()}</span>}</button>
+            <RenewalNotifications/>
             {/* Search */}
             <div className="flex-1 min-w-0 relative">
               <div className="flex items-center gap-2 bg-white/10 rounded-full px-3 md:px-4 py-2 md:py-2.5 focus-within:bg-white/15 focus-within:border-white/20 border border-transparent transition-all">
