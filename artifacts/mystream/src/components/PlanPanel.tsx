@@ -1,3 +1,4 @@
+import PixTestPanel from './PixTestPanel';
 import {useEffect, useState} from 'react';
 import {Check, Crown, RefreshCw} from 'lucide-react';
 import {useBilling} from '../context/BillingContext';
@@ -50,8 +51,9 @@ export default function PlanPanel() {
   finally {setBusy(false);}
  };
  return <div className="space-y-6">
+  {status.isAdmin && <PixTestPanel/>}
   {status.testMode && <div className="rounded-2xl border border-primary bg-primary/10 p-5 space-y-3">
-   <h2 className="font-bold">Ambiente de teste · sem cobranças</h2>
+   <h2 className="font-bold">Simulação de planos · sem assinatura paga</h2>
    <p className="text-sm">{status.isAdmin ? 'Administrador: alterne seu plano para conferir os recursos e limites. O Pro de teste dura 7 dias.' : 'As assinaturas estão em teste. Pagamentos desativados.'}</p>
    {status.isAdmin && <div className="flex flex-wrap gap-3">
     <button disabled={busy} onClick={()=>void simulate('free')} className="rounded-xl bg-secondary px-4 py-3 disabled:opacity-50">Testar Gratuito</button>

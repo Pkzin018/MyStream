@@ -30,7 +30,7 @@ function sbHeaders(env, extra = {}) {
   // Chaves novas (sb_secret_...) só vão em "apikey"; chaves JWT legadas também em Authorization.
   return { apikey: key, ...(key.startsWith('eyJ') ? { Authorization: 'Bearer ' + key } : {}), 'Content-Type': 'application/json', ...extra };
 }
-async function sb(env, path, init = {}) {
+export async function sb(env, path, init = {}) {
   const res = await fetch(env.SUPABASE_URL + path, { ...init, headers: sbHeaders(env, init.headers), signal: AbortSignal.timeout(8000) });
   if (!res.ok) throw new Error('supabase ' + res.status + ' ' + path);
   const text = await res.text();
@@ -49,7 +49,7 @@ async function storageUsed(env, uid) {
 }
 
 // ---------- Autenticação do usuário (JWT do Supabase Auth) ----------
-async function authUser(request, env) {
+export async function authUser(request, env) {
   const token = /^Bearer (.+)$/.exec(request.headers.get('Authorization') || '')?.[1];
   if (!token) return null;
   try {
@@ -61,7 +61,7 @@ async function authUser(request, env) {
 }
 
 // ---------- Mercado Pago ----------
-async function mp(env, path, init = {}) {
+export async function mp(env, path, init = {}) {
   const res = await fetch('https://api.mercadopago.com' + path, { ...init, headers: { Authorization: 'Bearer ' + env.MP_ACCESS_TOKEN, 'Content-Type': 'application/json', ...init.headers }, signal: AbortSignal.timeout(10000) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) { const err = new Error('mp ' + res.status); err.status = res.status; err.data = data; throw err; }
@@ -85,7 +85,7 @@ export async function syncPreapproval(env, preapprovalId, expectedUid) {
   return row;
 }
 
-async function verifySignature(request, url, secret) {
+export async function verifySignature(request, url, secret) {
   const sig = request.headers.get('x-signature') || '';
   const ts = /(?:^|,)\s*ts=([^,]+)/.exec(sig)?.[1];
   const v1 = /(?:^|,)\s*v1=([^,]+)/.exec(sig)?.[1];

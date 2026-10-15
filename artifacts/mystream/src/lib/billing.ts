@@ -48,3 +48,6 @@ export function formatBytes(bytes: number) {
 export const openPlan = () => window.dispatchEvent(new Event('mystream-open-plan'));
 
 export const setTestPlan = (plan: 'free' | 'pro') => authed<BillingStatus>('/api/billing/test-plan', {method:'POST',body:JSON.stringify({plan})});
+
+export interface PixTestResult {payment: {id:string; status:string; detail:string; paid:boolean; amount:string; qrCode:string; qrImage:string} | null; webhookConfigured:boolean}
+export const pixTest = (body?:{email:string;confirmRealPayment:boolean}) => authed<PixTestResult>(body?'/api/billing/pix':'/api/billing/pix/status',body?{method:'POST',body:JSON.stringify(body)}:{});
