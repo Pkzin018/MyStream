@@ -1,7 +1,8 @@
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from './components/ui/dropdown-menu';
 import RenewalNotifications from './components/RenewalNotifications';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Menu } from 'lucide-react';
+import { Search, X, Menu, UserRound, Crown, KeyRound, LogOut } from 'lucide-react';
 import { PlayerProvider, usePlayer } from './context/PlayerContext';
 import Sidebar from './components/Sidebar';
 import PlayerBar from './components/PlayerBar';
@@ -26,7 +27,7 @@ const LS_API_KEY = 'mystream_yt_api_key';
 
 function AppInner() {
   const { corDinamica, dispatch, itemAtual, tocando, anteriorMidia, proximaMidia } = usePlayer();
-  const {user,avatar}=useAccount();
+  const {user,avatar,signOut}=useAccount();
   const [profileOpen,setProfileOpen]=useState(()=>new URLSearchParams(window.location.search).get('billing')==='return');
   const [profileTab,setProfileTab]=useState<'profile'|'password'|'plan'>(()=>new URLSearchParams(window.location.search).get('billing')==='return'?'plan':'profile');
   const [view, setView] = useState<View>('inicio');
@@ -35,8 +36,6 @@ function AppInner() {
   const [queueOpen, setQueueOpen] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
   const [playlistModalItem, setPlaylistModalItem] = useState<MediaItem | null>(null);
   const apiKey = '';
 
@@ -53,7 +52,7 @@ function AppInner() {
 
   useEffect(() => {
     if(new URLSearchParams(window.location.search).has('billing')) window.history.replaceState(null,'',window.location.pathname);
-    const openPlan=()=>{setProfileTab('plan');setProfileOpen(true);setSidebarOpen(false);};
+    const openPlan=()=>{setProfileTab('plan');setProfileOpen(true);};
     window.addEventListener('mystream-open-plan',openPlan);
     return ()=>window.removeEventListener('mystream-open-plan',openPlan);
   }, []);
@@ -81,7 +80,7 @@ function AppInner() {
   const handleViewChange = useCallback((v: View) => {
     setProfileOpen(false);
     setView(v);
-    setSidebarOpen(false);
+    
   }, []);
 
   return (
@@ -95,40 +94,10 @@ function AppInner() {
       {/* Audio element */}
       <audio id="ms-audio" />
 
-      {/* Mobile sidebar overlay */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <>
-            <motion.div
-              className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm md:hidden"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSidebarOpen(false)}
-            />
-            <motion.div
-              className="fixed top-0 left-0 bottom-0 z-[201] w-72 md:hidden"
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            >
-              <Sidebar
-                view={view}
-                onViewChange={handleViewChange}
-                onAddMedia={handleAddMedia}
-                apiKey={apiKey}
-                onSetApiKey={handleApiKey}
-              />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
       {/* Main layout */}
       <div className="app-layout flex h-dvh pb-mobile-player md:pb-[90px]">
         {/* Desktop Sidebar */}
-        <div id="desktop-sidebar" className={`sidebar hidden md:block w-72 flex-shrink-0 p-3 h-full ${focusMode || desktopSidebarCollapsed ? '!hidden' : ''}`}>
+        <div id="desktop-sidebar" className={`sidebar hidden md:block w-72 flex-shrink-0 p-3 h-full ${focusMode ? '!hidden' : ''}`}>
           <Sidebar
             view={view}
             onViewChange={handleViewChange}
@@ -142,32 +111,20 @@ function AppInner() {
         <div className="app-main min-w-0 flex-1 flex flex-col overflow-hidden p-2 md:p-3 md:pl-0 gap-2 md:gap-3">
           {/* Top nav */}
           <div className="app-header glass-panel rounded-xl flex items-center gap-3 px-3 md:px-4 py-2.5 md:py-3 flex-shrink-0">
-            {/* Navigation toggle at each screen size */}
-            <div className="md:hidden">
-            <button
-              type="button"
-              aria-label="Abrir menu"
-              aria-expanded={sidebarOpen}
-              className="icon-btn flex-shrink-0"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu size={20} />
-            </button>
-            </div>
-            <div className="hidden md:block">
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label={focusMode || desktopSidebarCollapsed ? 'Abrir menu lateral' : 'Recolher menu lateral'}
-                title={focusMode || desktopSidebarCollapsed ? 'Abrir menu lateral' : 'Recolher menu lateral'}
-                aria-controls="desktop-sidebar"
-                aria-expanded={!focusMode && !desktopSidebarCollapsed}
-                onClick={() => {
-                  if (focusMode) { setFocusMode(false); setDesktopSidebarCollapsed(false); }
-                  else setDesktopSidebarCollapsed(collapsed => !collapsed);
-                }}
-              ><Menu size={20} /></button>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="icon-btn" aria-label="Abrir configurações da conta" title="Configurações da conta"><Menu size={20} /></button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" sideOffset={10} collisionPadding={12} className="z-[240] w-60 max-w-[calc(100vw-24px)] rounded-xl bg-card text-foreground p-2 shadow-xl">
+                <DropdownMenuLabel>Configurações da conta</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="cursor-pointer py-3" onSelect={() => {setProfileTab('profile');setProfileOpen(true);}}><UserRound />Meu perfil</DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer py-3" onSelect={() => {setProfileTab('plan');setProfileOpen(true);}}><Crown />Plano Pro</DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer py-3" onSelect={() => {setProfileTab('password');setProfileOpen(true);}}><KeyRound />Alterar senha</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="cursor-pointer py-3 text-destructive focus:text-destructive" onSelect={() => {void signOut();}}><LogOut />Sair da conta</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {focusMode && (
               <button
