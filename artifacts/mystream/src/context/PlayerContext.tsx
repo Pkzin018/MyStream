@@ -162,6 +162,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [debug]);
   const progressoInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const listaAtualRef = useRef<MediaItem[]>([]);
+  const playItemRef = useRef<(item: MediaItem) => void>(() => {});
+  const sameTrack = (a: MediaItem, b: MediaItem) => a.storagePath && b.storagePath ? a.storagePath === b.storagePath : a.url === b.url;
+  const replaceQueue = useCallback((fila: MediaItem[]) => {
+    stateRef.current = {...stateRef.current, fila};
+    dispatch({type: 'SET_FILA', payload: fila});
+  }, []);
   const ytPlayerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -259,40 +265,51 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const proximaMidia = useCallback(() => {
-    const fila = state.fila;
-    if (fila.length > 0) {
-      const [prox, ...resto] = fila;
-      dispatch({ type: 'SET_FILA', payload: resto });
-      tocarItemInterno(prox);
-    } else if (itemAtual && listaAtualRef.current.length > 1) {
-      const idx = listaAtualRef.current.findIndex(i => i.url === itemAtual.url);
-      const cfg = state.configuracoes;
-      if (cfg.repeat === 'one') { tocarItemInterno(itemAtual); return; }
-      if (cfg.shuffle) {
-        const rand = Math.floor(Math.random() * listaAtualRef.current.length);
-        tocarItemInterno(listaAtualRef.current[rand]);
-        return;
-      }
-      const next = listaAtualRef.current[idx + 1];
-      if (next) { tocarItemInterno(next); return; }
-      if (cfg.repeat === 'all') { tocarItemInterno(listaAtualRef.current[0]); }
+    const {fila, configuracoes: cfg} = stateRef.current;
+    const current = playbackRef.current.item;
+    if (fila.length) {
+      replaceQueue(fila.slice(1));
+      playItemRef.current(fila[0]);
+      return;
     }
-  }, [state.fila, itemAtual, state.configuracoes]);
+    const list = listaAtualRef.current;
+    if (!current || !list.length) return;
+    const index = list.findIndex(item => sameTrack(item, current));
+    let next: MediaItem | undefined;
+    if (cfg.repeat === 'one') next = current;
+    else if (cfg.shuffle) next = list[Math.floor(Math.random() * list.length)];
+    else if (index >= 0 && index + 1 < list.length) next = list[index + 1];
+    else if (cfg.repeat === 'all') next = list[0];
+    if (next) playItemRef.current(next);
+  }, [replaceQueue]);
 
   const anteriorMidia = useCallback(() => {
-    const hist = state.historico;
-    if (hist.length > 1) {
-      const anterior = hist[hist.length - 2];
-      dispatch({ type: 'SET_STATE', payload: { historico: hist.slice(0, -1) } });
-      tocarItemInterno(anterior);
+    const current = playbackRef.current.item;
+    if (!current) return;
+    const list = listaAtualRef.current;
+    const index = list.findIndex(item => sameTrack(item, current));
+    if (index > 0) {
+      replaceQueue(list.slice(index));
+      playItemRef.current(list[index - 1]);
+      return;
     }
-  }, [state.historico]);
+    const hist = stateRef.current.historico;
+    const historyIndex = hist.findIndex(item => sameTrack(item, current));
+    if (index < 0 && historyIndex > 0) {
+      replaceQueue([current, ...stateRef.current.fila]);
+      playItemRef.current(hist[historyIndex - 1]);
+    } else {
+      const audio = audioRef.current;
+      if (current.tipo === 'audio' && audio) {audio.currentTime = 0; desiredPlayback.current = true; playAudio(audio);}
+    }
+  }, [replaceQueue, playAudio]);
 
   const tocarItemInterno = useCallback((item: MediaItem) => {
     window.dispatchEvent(new CustomEvent('mystream-media-selected', { detail: { tipo: item.tipo } }));
     setItemAtual(item);
     setModoAudio(false);
     setTocando(true);
+    setProgresso(0); setCurrentTime(0); setDuracao(0);
     dispatch({ type: 'ADD_HISTORICO', payload: item });
     mudarCorDinamica(item.thumb || item.nome);
 
@@ -321,22 +338,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
     } else if (item.tipo === 'audio' && audio) {
       audio.src = item.url;
-      audio.volume = state.configuracoes.volume;
+      audio.volume = stateRef.current.configuracoes.volume;
+      audio.load();
       playAudio(audio);
       iniciarProgresso(false, audio);
     } else if (item.tipo === 'video') {
       iniciarProgresso(false, document.getElementById('ms-video') as HTMLVideoElement);
     }
-  }, [state.configuracoes.volume, mudarCorDinamica, iniciarProgresso, proximaMidia, playAudio]);
+  }, [mudarCorDinamica, iniciarProgresso, playAudio]);
+  playItemRef.current = tocarItemInterno;
 
   const tocarItem = useCallback((item: MediaItem, lista?: MediaItem[]) => {
     if (lista) {
       listaAtualRef.current = lista;
-      const idx = lista.findIndex(i => i.url === item.url);
-      dispatch({ type: 'SET_FILA', payload: lista.slice(idx + 1) });
+      const idx = lista.findIndex(i => sameTrack(i, item));
+      replaceQueue(lista.slice(idx + 1));
     }
     tocarItemInterno(item);
-  }, [tocarItemInterno]);
+  }, [tocarItemInterno, replaceQueue]);
 
   const playPause = useCallback(() => {
     if (!itemAtual) return;
