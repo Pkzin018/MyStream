@@ -1,3 +1,4 @@
+import { Toaster } from 'sonner';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from './components/ui/dropdown-menu';
 import RenewalNotifications from './components/RenewalNotifications';
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -88,6 +89,7 @@ function AppInner() {
       className={`app-shell relative min-h-screen bg-background ${focusMode ? 'focus-mode' : ''} ${itemAtual ? 'has-media' : ''}`}
       style={{ '--dynamic-color': corDinamica } as React.CSSProperties}
     >
+      <Toaster position="top-center" richColors closeButton />
       {/* Dynamic gradient background */}
       <div className="dynamic-bg" />
 

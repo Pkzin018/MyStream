@@ -1,3 +1,5 @@
+import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
 import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback, useState } from 'react';
 import type { MediaItem, AppState } from '../types';
 import { adicionarAoHistorico, toggleFavorito } from '../lib/storage';
@@ -138,6 +140,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [modoAudio, setModoAudio] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
+  const playbackRef = useRef({ item: itemAtual, next: () => {}, previous: () => {} });
+  const playbackGeneration = useRef(0);
+  const recoveryAttempted = useRef(false);
+  const desiredPlayback = useRef(false);
+  const lastAudioTime = useRef(0);
+  const resumePosition = useRef<number | null>(null);
+  const debug = useCallback((event: string, code?: number) => {
+    if (new URLSearchParams(window.location.search).get('debugAudio') !== '1') return;
+    // No names, URLs, signed tokens or account data in diagnostics.
+    console.info('[MyStream playback]', {at: new Date().toISOString(), event, visibility: document.visibilityState, code});
+  }, []);
+  const playAudio = useCallback((audio: HTMLAudioElement) => {
+    const generation = playbackGeneration.current;
+    void audio.play().catch((error: DOMException) => {
+      if (generation !== playbackGeneration.current || error.name === 'AbortError') return;
+      setTocando(false);
+      debug('play-rejected');
+      toast.error('Não foi possível iniciar o áudio. Toque em reproduzir para tentar novamente.');
+    });
+  }, [debug]);
   const progressoInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const listaAtualRef = useRef<MediaItem[]>([]);
   const ytPlayerRef = useRef<any>(null);
@@ -283,7 +305,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
 
     const audio = audioRef.current;
-    if (audio) { audio.pause(); audio.src = ''; }
+    playbackGeneration.current++;
+    recoveryAttempted.current = false;
+    resumePosition.current = null;
+    lastAudioTime.current = 0;
+    desiredPlayback.current = item.tipo === 'audio';
+    playbackRef.current.item = item;
+    if (audio && item.tipo !== 'audio') audio.pause();
     if (ytPlayerRef.current?.pauseVideo) { ytPlayerRef.current.pauseVideo(); }
 
     if (item.tipo === 'yt') {
@@ -294,13 +322,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } else if (item.tipo === 'audio' && audio) {
       audio.src = item.url;
       audio.volume = state.configuracoes.volume;
-      audio.play().catch(() => {});
-      audio.onended = () => proximaMidia();
+      playAudio(audio);
       iniciarProgresso(false, audio);
     } else if (item.tipo === 'video') {
       iniciarProgresso(false, document.getElementById('ms-video') as HTMLVideoElement);
     }
-  }, [state.configuracoes.volume, mudarCorDinamica, iniciarProgresso, proximaMidia]);
+  }, [state.configuracoes.volume, mudarCorDinamica, iniciarProgresso, proximaMidia, playAudio]);
 
   const tocarItem = useCallback((item: MediaItem, lista?: MediaItem[]) => {
     if (lista) {
@@ -321,10 +348,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } else {
       const el=itemAtual.tipo==='video'?document.getElementById('ms-video') as HTMLVideoElement:audio;
       if(!el) return;
-      if (el.paused) { void el.play().catch(()=>setTocando(false)); setTocando(true); }
-      else { el.pause(); setTocando(false); }
+      if (el.paused) {
+        desiredPlayback.current = true;
+        if (itemAtual.tipo === 'audio') playAudio(el as HTMLAudioElement);
+        else void el.play().catch(()=>setTocando(false));
+        setTocando(true);
+      } else { desiredPlayback.current = false; el.pause(); setTocando(false); }
     }
-  }, [itemAtual]);
+  }, [itemAtual, playAudio]);
 
   const buscarTempo = useCallback((pct: number) => {
     if (!itemAtual) return;
@@ -397,25 +428,80 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setModoAudio(p => !p);
   }, []);
 
-  // Native audio controls, including supported lock-screen/headset actions.
-  useEffect(()=>{
-    if(!('mediaSession' in navigator) || itemAtual?.tipo!=='audio')return;
-    const session=navigator.mediaSession;
-    if(typeof MediaMetadata!=='undefined')session.metadata=new MediaMetadata({title:itemAtual.nome,artist:itemAtual.artista||'MyStream',artwork:itemAtual.thumb?[{src:itemAtual.thumb}]:[]});
-    const audio=audioRef.current;
-    if(audio)audio.onended=proximaMidia;
-    const handlers:Partial<Record<MediaSessionAction, MediaSessionActionHandler>>={
-      play:()=>{void audio?.play().catch(()=>setTocando(false));},
-      pause:()=>audio?.pause(),
-      previoustrack:anteriorMidia,
-      nexttrack:proximaMidia,
-      seekto:d=>{if(audio && d.seekTime!==undefined)audio.currentTime=d.seekTime;},
-      seekbackward:d=>{if(audio)audio.currentTime=Math.max(0,audio.currentTime-(d.seekOffset||10));},
-      seekforward:d=>{if(audio && Number.isFinite(audio.duration))audio.currentTime=Math.min(audio.duration,audio.currentTime+(d.seekOffset||10));},
+  playbackRef.current = {item: itemAtual, next: proximaMidia, previous: anteriorMidia};
+
+  // Persistent native handlers use refs so track changes do not clear the session.
+  useEffect(() => {
+    if (!accountReady) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+    const ended = () => playbackRef.current.next();
+    const progress = () => { if (!audio.error) lastAudioTime.current = audio.currentTime; };
+    const loaded = () => {
+      if (resumePosition.current === null) return;
+      const position = resumePosition.current;
+      resumePosition.current = null;
+      if (Number.isFinite(audio.duration)) audio.currentTime = Math.min(position, Math.max(0, audio.duration - 0.1));
+      if (desiredPlayback.current) playAudio(audio);
     };
-    for(const [action,handler] of Object.entries(handlers))try{session.setActionHandler(action as MediaSessionAction,handler!);}catch{}
-    return()=>{for(const action of Object.keys(handlers))try{session.setActionHandler(action as MediaSessionAction,null);}catch{}session.playbackState='none';session.metadata=null;};
-  },[itemAtual?.url,itemAtual?.tipo,anteriorMidia,proximaMidia]);
+    const recover = async () => {
+      debug('audio-error', audio.error?.code);
+      const item = playbackRef.current.item;
+      if (!item || item.tipo !== 'audio') return;
+      if (!item.storagePath || recoveryAttempted.current || audio.error?.code === 3) {
+        setTocando(false);
+        toast.error('Falha ao carregar o áudio. Verifique sua conexão e tente novamente.');
+        return;
+      }
+      recoveryAttempted.current = true;
+      const generation = playbackGeneration.current;
+      const position = lastAudioTime.current;
+      try {
+        const {data, error} = await supabase.storage.from('mystream-media').createSignedUrl(item.storagePath, 86400);
+        if (generation !== playbackGeneration.current || !mountedRef.current) return;
+        if (error || !data?.signedUrl) throw new Error('renewal');
+        resumePosition.current = position;
+        audio.src = data.signedUrl;
+        audio.load();
+        debug('url-renewed');
+      } catch {
+        if (generation !== playbackGeneration.current || !mountedRef.current) return;
+        setTocando(false);
+        toast.error('Não foi possível renovar o acesso ao áudio. Tente reproduzir novamente.');
+      }
+    };
+    const visibility = () => debug('visibilitychange');
+    const events = ['play','pause','ended','stalled','waiting','loadedmetadata'] as const;
+    const log = (event: Event) => debug(event.type);
+    audio.addEventListener('ended', ended);
+    audio.addEventListener('timeupdate', progress);
+    audio.addEventListener('loadedmetadata', loaded);
+    audio.addEventListener('error', recover);
+    events.forEach(event => audio.addEventListener(event, log));
+    document.addEventListener('visibilitychange', visibility);
+    const session = 'mediaSession' in navigator ? navigator.mediaSession : null;
+    const handlers: Partial<Record<MediaSessionAction, MediaSessionActionHandler>> = {
+      play: () => {if(playbackRef.current.item?.tipo === 'audio'){desiredPlayback.current=true;playAudio(audio);}},
+      pause: () => {if(playbackRef.current.item?.tipo === 'audio'){desiredPlayback.current=false;audio.pause();}},
+      nexttrack: () => {if(playbackRef.current.item?.tipo === 'audio') playbackRef.current.next();},
+      previoustrack: () => {if(playbackRef.current.item?.tipo === 'audio') playbackRef.current.previous();},
+      seekto: d => {if(playbackRef.current.item?.tipo === 'audio' && d.seekTime !== undefined)audio.currentTime=d.seekTime;},
+      seekbackward: d => {if(playbackRef.current.item?.tipo === 'audio')audio.currentTime=Math.max(0,audio.currentTime-(d.seekOffset||10));},
+      seekforward: d => {if(playbackRef.current.item?.tipo === 'audio' && Number.isFinite(audio.duration))audio.currentTime=Math.min(audio.duration,audio.currentTime+(d.seekOffset||10));},
+    };
+    for (const [action, handler] of Object.entries(handlers)) try {session?.setActionHandler(action as MediaSessionAction, handler!);} catch {}
+    return () => {
+      playbackGeneration.current++;
+      audio.removeEventListener('ended', ended);
+      audio.removeEventListener('timeupdate', progress);
+      audio.removeEventListener('loadedmetadata', loaded);
+      audio.removeEventListener('error', recover);
+      events.forEach(event => audio.removeEventListener(event, log));
+      document.removeEventListener('visibilitychange', visibility);
+      for (const action of Object.keys(handlers)) try {session?.setActionHandler(action as MediaSessionAction, null);} catch {}
+      if (session) {session.metadata=null;session.playbackState='none';}
+    };
+  }, [accountReady, debug, playAudio]);
   useEffect(()=>{
     if(!('mediaSession' in navigator)||itemAtual?.tipo!=='audio')return;
     navigator.mediaSession.playbackState=tocando?'playing':'paused';
