@@ -1,3 +1,4 @@
+import { decodeMediaText } from '../lib/utils';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Check } from 'lucide-react';
@@ -61,10 +62,10 @@ export default function PlaylistModal({ isOpen, item, onClose }: PlaylistModalPr
               <div className="flex items-center gap-3 mb-5 p-3 rounded-xl bg-white/5">
                 <img
                   src={item.thumb || 'https://picsum.photos/seed/pl/40/40'}
-                  alt={item.nome}
+                  alt={decodeMediaText(item.nome)}
                   className="w-10 h-10 rounded object-cover"
                 />
-                <p className="text-sm font-medium text-foreground truncate">{item.nome}</p>
+                <p className="text-sm font-medium text-foreground truncate">{decodeMediaText(item.nome)}</p>
               </div>
             )}
 

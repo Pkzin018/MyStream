@@ -1,3 +1,4 @@
+import { decodeMediaText } from '../lib/utils';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, GripVertical, Trash2, Music } from 'lucide-react';
@@ -56,12 +57,12 @@ export default function QueuePanel({ isOpen, onClose }: QueuePanelProps) {
               <div className="flex items-center gap-3">
                 <img
                   src={itemAtual.thumb || 'https://picsum.photos/seed/now/40/40'}
-                  alt={itemAtual.nome}
+                  alt={decodeMediaText(itemAtual.nome)}
                   className="w-10 h-10 rounded object-cover"
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-primary truncate">{itemAtual.nome}</p>
-                  <p className="text-xs text-muted-foreground">{itemAtual.artista || 'MyStream'}</p>
+                  <p className="text-sm font-semibold text-primary truncate">{decodeMediaText(itemAtual.nome)}</p>
+                  <p className="text-xs text-muted-foreground">{decodeMediaText(itemAtual.artista) || 'MyStream'}</p>
                 </div>
                 <div className="equalizer active ml-auto">
                   <div className="bar"/><div className="bar"/><div className="bar"/><div className="bar"/>
@@ -103,18 +104,18 @@ export default function QueuePanel({ isOpen, onClose }: QueuePanelProps) {
                     <GripVertical size={14} className="text-muted-foreground flex-shrink-0" />
                     <img
                       src={item.thumb || 'https://picsum.photos/seed/q/36/36'}
-                      alt={item.nome}
+                      alt={decodeMediaText(item.nome)}
                       className="w-9 h-9 rounded object-cover flex-shrink-0"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground truncate">{item.nome}</p>
+                      <p className="text-sm font-medium text-foreground truncate">{decodeMediaText(item.nome)}</p>
                       <p className="text-xs text-muted-foreground">
                         {item.tipo === 'yt' ? 'YouTube' : 'Local'}
                       </p>
                     </div>
                     <button
                       className="icon-btn"
-                      aria-label={"Remover " + item.nome + " da fila"}
+                      aria-label={"Remover " + decodeMediaText(item.nome) + " da fila"}
                       onClick={() => removerDaFila(idx)}
                     >
                       <X size={13} />

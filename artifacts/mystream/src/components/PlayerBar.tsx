@@ -1,3 +1,4 @@
+import { decodeMediaText } from '../lib/utils';
 import {useState} from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -69,7 +70,7 @@ export default function PlayerBar({ onOpenQueue, onFocusMode, isMobile }: Player
       <div className="mobile-mini-player flex md:hidden items-center gap-2 px-3 py-2">
         <button className="flex items-center gap-3 min-w-0 flex-1 text-left" aria-label="Abrir controles da reprodução" onClick={()=>{if(itemAtual?.tipo!=='audio')onFocusMode();else setExpanded(true);}}>
           <img src={itemAtual?.thumb || '/mystream-logo.png'} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0"/>
-          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold truncate">{itemAtual?.nome || 'Nada tocando'}</span><span className="block text-xs text-muted-foreground truncate">{itemAtual?.artista || 'MyStream'}</span></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold truncate">{decodeMediaText(itemAtual?.nome) || 'Nada tocando'}</span><span className="block text-xs text-muted-foreground truncate">{decodeMediaText(itemAtual?.artista) || 'MyStream'}</span></span>
         </button>
         <button className="icon-btn shrink-0" onClick={onOpenQueue} aria-label="Abrir lista de reprodução"><ListMusic size={20}/></button>
         <button className="play-btn-main shrink-0" onClick={playPause} aria-label={tocando?'Pausar':'Reproduzir'}>{tocando?<Pause size={20} fill="black"/>:<Play size={20} fill="black"/>}</button>
@@ -92,7 +93,7 @@ export default function PlayerBar({ onOpenQueue, onFocusMode, isMobile }: Player
               >
                 <img
                   src={itemAtual.thumb || 'https://picsum.photos/seed/nowplay/56/56'}
-                  alt={itemAtual.nome}
+                  alt={decodeMediaText(itemAtual.nome)}
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -115,11 +116,11 @@ export default function PlayerBar({ onOpenQueue, onFocusMode, isMobile }: Player
                 exit={{ opacity: 0, y: -5 }}
                 className="text-sm font-semibold truncate text-foreground"
               >
-                {itemAtual?.nome || 'Nada tocando'}
+                {decodeMediaText(itemAtual?.nome) || 'Nada tocando'}
               </motion.p>
             </AnimatePresence>
             <p className="text-xs text-muted-foreground truncate">
-              {itemAtual?.artista || 'MyStream Premium'}
+              {decodeMediaText(itemAtual?.artista) || 'MyStream Premium'}
             </p>
           </div>
 
@@ -231,7 +232,7 @@ export default function PlayerBar({ onOpenQueue, onFocusMode, isMobile }: Player
     {expanded&&itemAtual&&<div className="mobile-full-player fixed inset-0 z-[220] bg-background text-foreground p-6 flex flex-col overflow-y-auto md:hidden" role="dialog" aria-modal="true" aria-label="Reprodução" onKeyDown={e=>{if(e.key==='Escape')setExpanded(false);}}>
       <div className="flex items-center justify-between mb-6"><p className="text-xs font-semibold tracking-widest text-muted-foreground">TOCANDO AGORA</p><button autoFocus className="icon-btn" aria-label="Fechar controles" onClick={()=>setExpanded(false)}><X size={22}/></button></div>
       <img src={itemAtual.thumb || '/mystream-logo.png'} alt="" className="w-full aspect-square max-w-80 self-center rounded-2xl object-cover shadow-xl"/>
-      <h2 className="text-xl font-bold mt-6">{itemAtual.nome}</h2><p className="text-muted-foreground mt-1">{itemAtual.artista}</p>
+      <h2 className="text-xl font-bold mt-6">{decodeMediaText(itemAtual.nome)}</h2><p className="text-muted-foreground mt-1">{decodeMediaText(itemAtual.artista)}</p>
       <input aria-label="Posição da reprodução" type="range" min={0} max={100} step={.1} value={progresso} onChange={handleProgress} className="progress-slider w-full mt-7" style={{'--progress':`${progresso}%`} as React.CSSProperties}/>
       <div className="flex justify-between text-xs text-muted-foreground mt-3"><span>{formatTime(currentTime)}</span><span>{formatTime(duracao)}</span></div>
       <div className="flex items-center justify-between mt-5"><button className={`icon-btn ${configuracoes.shuffle?'active':''}`} onClick={toggleShuffle} aria-label="Aleatório" aria-pressed={configuracoes.shuffle}><Shuffle size={22}/></button><button className="icon-btn" onClick={anteriorMidia} aria-label="Anterior"><SkipBack size={28}/></button><button className="play-btn-main !w-16 !h-16" onClick={playPause} aria-label={tocando?'Pausar':'Reproduzir'}>{tocando?<Pause size={28} fill="black"/>:<Play size={28} fill="black"/>}</button><button className="icon-btn" onClick={proximaMidia} aria-label="Próxima"><SkipForward size={28}/></button><button className={`icon-btn ${configuracoes.repeat!=='none'?'active':''}`} onClick={toggleRepeat} aria-label="Repetir" aria-pressed={configuracoes.repeat!=='none'}><RepeatIcon size={22}/></button></div>

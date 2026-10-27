@@ -1,3 +1,4 @@
+import { decodeMediaText } from '../lib/utils';
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Heart, Trash2, ListPlus, Plus, MoreHorizontal, X } from 'lucide-react';
@@ -62,7 +63,7 @@ export default function MediaCard({ item, index, lista, isBusca, playlistId, onA
     onRemove?.(item);
   };
 
-  const thumb = (!imgError && item.thumb) ? item.thumb : `https://picsum.photos/seed/${encodeURIComponent(item.nome)}/200/200`;
+  const thumb = (!imgError && item.thumb) ? item.thumb : `https://picsum.photos/seed/${encodeURIComponent(decodeMediaText(item.nome))}/200/200`;
 
   return (
     <>
@@ -76,7 +77,7 @@ export default function MediaCard({ item, index, lista, isBusca, playlistId, onA
       <div className="card-img-wrap">
         <img
           src={thumb}
-          alt={item.nome}
+          alt={decodeMediaText(item.nome)}
           className="card-img-wrap-img w-full h-full object-cover"
           loading="lazy"
           onError={() => setImgError(true)}
@@ -145,14 +146,14 @@ export default function MediaCard({ item, index, lista, isBusca, playlistId, onA
         </button>
       </div>
 
-      <div className="card-caption flex gap-1 items-start"><h4 className="card-title min-w-0 flex-1 text-sm font-bold text-foreground truncate mb-1">{item.nome}</h4><button ref={menuTrigger} className="mobile-card-menu md:hidden shrink-0" aria-label={"Opções de " + item.nome} onClick={e=>{e.stopPropagation();setMenuOpen(true);}}><MoreHorizontal size={20}/></button></div>
+      <div className="card-caption flex gap-1 items-start"><h4 className="card-title min-w-0 flex-1 text-sm font-bold text-foreground truncate mb-1">{decodeMediaText(item.nome)}</h4><button ref={menuTrigger} className="mobile-card-menu md:hidden shrink-0" aria-label={"Opções de " + decodeMediaText(item.nome)} onClick={e=>{e.stopPropagation();setMenuOpen(true);}}><MoreHorizontal size={20}/></button></div>
       <p className="text-xs text-muted-foreground truncate">
-        {item.artista || (item.tipo === 'yt' ? 'YouTube' : 'Mídia Local')}
+        {decodeMediaText(item.artista) || (item.tipo === 'yt' ? 'YouTube' : 'Mídia Local')}
       </p>
     </motion.div>
     {menuOpen && <div className="fixed inset-0 z-[300] bg-black/70 flex items-end md:hidden" onClick={closeMenu}>
       <section role="dialog" aria-modal="true" aria-label="Opções da mídia" className="mobile-actions bg-background text-foreground w-full rounded-t-3xl p-5 border-t border-border" onClick={e=>e.stopPropagation()} onKeyDown={e=>{if(e.key==='Escape')closeMenu();if(e.key==='Tab'){const buttons=Array.from(e.currentTarget.querySelectorAll('button'));const first=buttons[0],last=buttons[buttons.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}}}>
-       <div className="flex items-start gap-3 mb-4"><h3 className="font-semibold flex-1">{item.nome}</h3><button ref={menuClose} className="icon-btn" aria-label="Fechar opções" onClick={closeMenu}><X size={20}/></button></div>
+       <div className="flex items-start gap-3 mb-4"><h3 className="font-semibold flex-1">{decodeMediaText(item.nome)}</h3><button ref={menuClose} className="icon-btn" aria-label="Fechar opções" onClick={closeMenu}><X size={20}/></button></div>
        <button onClick={e=>{handleFav(e);closeMenu();}}><Heart size={20}/>{fav?'Remover dos favoritos':'Favoritar'}</button>
        <button onClick={e=>{handleAddQueue(e);closeMenu();}}><ListPlus size={20}/>Adicionar à fila</button>
        {isBusca&&<button onClick={e=>{handleSave(e);closeMenu();}}><Plus size={20}/>Salvar na biblioteca</button>}
